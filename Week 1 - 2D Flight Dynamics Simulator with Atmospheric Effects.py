@@ -60,6 +60,38 @@ def Case1(t, state):
 
     return [dydt, dvdt, dm_fuel_dt]
 
+#Non-Thrust Vectoring Case
+def case2a(t, state):
+    y,x,v, m_f = state
+
+    # Controls mass and fuel
+    if m_f > 0:
+        Ft = F0
+        mt = m_v + m_f
+        dm_fuel_dt = -mm
+    else:
+        Ft = 0
+        mt = m_v
+        dm_fuel_dt = 0
+
+    return[dydt, dxdt ,dvdt, dm_fuel_dt]
+
+#Thrust Vectoring Case
+def case2b(t, state):
+    y,x,v, m_fuel = state
+
+    if m_f > 0:
+        Ft = F0
+        mt = m_v + m_f
+        dm_fuel_dt = -mm
+    else:
+        Ft = 0
+        mt = m_v
+        dm_fuel_dt = 0
+
+    return [dydt, dxdt, dvdt, dm_fuel_dt]
+
+
 
 # Check for when the ground is hit after fuel is totally consumed
 def hit_ground(t, state):
