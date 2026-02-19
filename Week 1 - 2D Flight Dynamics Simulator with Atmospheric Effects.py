@@ -27,8 +27,17 @@ H = 8500
 # Area(m)
 A = 1.0
 
+# Areqa(m) wing
+Aw =
+
+# Angle of Ascend
+theta =
+
 # Coefficient of Drag
-C = 0.3
+Cd = 0.3
+
+# Coefficient of Lifit
+CL =
 
 # Initial conditions
 # case 1
@@ -56,13 +65,13 @@ def Case1(t, state):
 
     # ODE
     dydt = v
-    dvdt = (Ft - mt * g - ((1 / 2) * rho * np.exp(-y / H) * v * abs(v) * A * C)) / mt
+    dvdt = (Ft - mt * g - ((1 / 2) * rho * np.exp(-y / H) * v * abs(v) * A * Cd)) / mt
 
     return [dydt, dvdt, dm_fuel_dt]
 
 #Non-Thrust Vectoring Case
 def case2a(t, state):
-    y,x,v, m_f = state
+    y,x,vy,vx,m_f = state
 
     # Controls mass and fuel
     if m_f > 0:
@@ -74,11 +83,18 @@ def case2a(t, state):
         mt = m_v
         dm_fuel_dt = 0
 
-    return[dydt, dxdt ,dvdt, dm_fuel_dt]
+    dydt = vy
+    dxdt = vx
+
+    dvydt = (Ft * np.sin(theta) - mt * g - ((1 / 2) * rho * np.exp(-y / H) * v * abs(v) * A * Cd) + (1/2 * rho * v * abs(v) * Aw ) / mt
+
+    dxydt =
+
+    return[dydt, dxdt ,dvydt, dxydt,dm_fuel_dt]
 
 #Thrust Vectoring Case
 def case2b(t, state):
-    y,x,v, m_fuel = state
+    y,x,vy,vx, m_fuel = state
 
     if m_f > 0:
         Ft = F0
@@ -89,8 +105,14 @@ def case2b(t, state):
         mt = m_v
         dm_fuel_dt = 0
 
-    return [dydt, dxdt, dvdt, dm_fuel_dt]
+    dydt = vy
+    dxdt = vx
 
+    dvydt = (Ft * np.sin(theta) - mt * g - ((1 / 2) * rho * np.exp(-y / H) * v * abs(v) * A * Cd) + (1/2 * rho * v * abs(v) * Aw ) ) / mt
+
+    dxydt =
+
+    return [dydt, dxdt, dvydt, dxydt, dm_fuel_dt]
 
 
 # Check for when the ground is hit after fuel is totally consumed
@@ -147,6 +169,9 @@ solution = solve_ivp(
 t = solution.t
 y = solution.y[0]
 v = solution.y[1]
+
+
+#Need to make this portion situational depending on the case
 
 #give information on max velocity, height, and impact time
 if solution.t_events[2].size > 0:
