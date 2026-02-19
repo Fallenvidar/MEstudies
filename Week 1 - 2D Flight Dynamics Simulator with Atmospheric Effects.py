@@ -45,7 +45,7 @@ def Case1(t, state):
     y, v, m_f = state
 
     # Controls mass and fuel
-    if m_fuel > 0:
+    if m_f > 0:
         Ft = F0
         mt = m_v + m_fuel
         dm_fuel_dt = -mm
