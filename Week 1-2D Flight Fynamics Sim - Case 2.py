@@ -27,7 +27,7 @@ H = 8500
 # Area(m)
 A = 1.0
 
-# Areqa(m) wing
+# Area(m) wing
 Aw =
 
 # Angle of Ascend
@@ -36,7 +36,7 @@ theta =
 # Coefficient of Drag
 Cd = 0.3
 
-# Coefficient of Lifit
+# Coefficient of Lift
 CL =
 
 # Initial conditions
@@ -47,6 +47,8 @@ F0 = mm * ve
 m_f0 = m_f
 state0 = [y0, v0, m_f0]
 t_span = (0, 1000)
+theta_b = 0
+theta_V = 0
 
 #Non-Thrust Vectoring Case
 def case2a(t, state):
@@ -62,11 +64,14 @@ def case2a(t, state):
         mt = m_v
         dm_fuel_dt = 0
 
+    # Theta Body change
+
+
+    theta_V = 70
+    #Outputs
     dydt = vy
     dxdt = vx
-
-    dvydt = (Ft * np.sin(theta) - mt * g - ((1 / 2) * rho * np.exp(-y / H) * v * abs(v) * A * Cd) + (1/2 * rho * v * abs(v) * Aw ) / mt
-
+    dvydt = (Ft * np.sin(theta_b) - mt * g - ((1 / 2) * rho * np.exp(-y / H) * v* abs(v) * A * Cd) + (1/2 * rho * v * abs(v) * Aw ) / mt
     dxydt =
 
     return[dydt, dxdt ,dvydt, dxydt,dm_fuel_dt]
@@ -75,6 +80,7 @@ def case2a(t, state):
 def case2b(t, state):
     y,x,vy,vx, m_fuel = state
 
+    # Controls mass and fuel
     if m_f > 0:
         Ft = F0
         mt = m_v + m_f
@@ -88,7 +94,6 @@ def case2b(t, state):
     dxdt = vx
 
     dvydt = (Ft * np.sin(theta) - mt * g - ((1 / 2) * rho * np.exp(-y / H) * v * abs(v) * A * Cd) + (1/2 * rho * v * abs(v) * Aw ) ) / mt
-
     dxydt =
 
     return [dydt, dxdt, dvydt, dxydt, dm_fuel_dt]
