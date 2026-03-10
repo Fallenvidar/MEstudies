@@ -10,31 +10,37 @@ H = 8500
 # F-16 Inspired parameters( Double check )(not after burner at military thrust)
 m_v = 8500      # kg dry mass (actual F-16 is ~8,500 kg)
 m_f = 3300      # kg fuel (internal fuel load)
-mm = 25.3       # kg/s fuel flow at military thrust
+mm = 10      # kg/s fuel flow at military thrust
 ve = 3000       # m/s effective exhaust velocity
 A = 27.87       # m² wing reference area
 Aw = 27.87      # same reference area for lift
-CL = 0.5        # cruise lift coefficient
+CL = 1.5      # cruise lift coefficient
 Cd = 0.02       # clean configuration drag coefficient
 
 # Initial conditions
 # case 1
-y0 = 0
+# starts in the air so lift will counteract gravity property
+y0 = 100
 x0 =0
 # helps to prevent sinking caused by gravity at start. Sacrifice since this is a particle ,and we are focusing on
 # the relationship between thrust vectoring and non-thrust vectoring
-vy0= 1.0
-vx0 = 0
+# have at min velocity to produce thrust modeling the takeoff point from a runway
+vy0= 10
+vx0 = 120
 F0 = mm * ve
 m_f0 = m_f
 state0 = [y0, x0,vy0,vx0, m_f0]
 t_span = (0, 5000)
 theta_b = np.radians(45)
 theta_v = 0
-target = 1500
+target = 2500
 max_angle = np.radians(60)
 #identifying phase
 phase = [1]
+# to record what happening at different phases
+phase_log = []
+
+min_angle = np.radians(45)
 
 #Non-Thrust Vectoring Case
 def case2a(t, state):
@@ -53,23 +59,23 @@ def case2a(t, state):
     v_mag = np.sqrt(vx**2 + vy**2)
 
     #----------------------------------------
-    # Theta Body change and angle stuff
+    # Theta Body change and angle stuff(put in a list for theta b so can do a theta body vs time graph)
     #Sacrfie for min launch angle to align with the fact this is a simulation it not suppose to be accuracy just get what we need out of it
-
-    #not complicated variables
-    theta_v = np.arctan2(vy, vx)
-    min_angle = np.radians(45)  # minimum launch angle
 
     #Restoing phase idea that there will be no oscillation
     #Using a list instead so there are no statefulness problems
+    min_angle = np.radians(45)  # minimum launch angle
     if phase[0] == 1 and y >= target / 2:
         phase[0] = 2
+        phase_log.append((2, t, y, v_mag))
         print(f"Phase 2 entered at y={y:.1f}m, v_mag={v_mag:.1f}m/s, t={t:.1f}s")
     if phase[0] == 2 and y >= target:
         phase[0] = 3
+        phase_log.append((3, t, y, v_mag))
         print(f"Phase 3 entered at y={y:.1f}m, v_mag={v_mag:.1f}m/s, t={t:.1f}s")
     if phase[0] == 3 and m_f <= 0:
         phase[0] = 4
+        phase_log.append((4, t, y, v_mag))
         print(f"Phase 4 entered at y={y:.1f}m, v_mag={v_mag:.1f}m/s, t={t:.1f}s")
 
 
@@ -82,6 +88,13 @@ def case2a(t, state):
         theta_b = 0
     else:
         theta_b = -np.radians(15) # descent, fuel gone
+
+
+    #limiter for theta_v
+    if v_mag < 20.0:  # below meaningful aerodynamic speed
+        theta_v = theta_b  # align with body, forces act along thrust direction
+    else:
+        theta_v = np.arctan2(vy, vx)
 
     #----------------------------------------
     #Outputs
@@ -144,12 +157,25 @@ x = solution.y[1]
 vy = solution.y[2]
 vx = solution.y[3]
 
+#solving v-mag over time
+v_mag_sol = np.hypot(vx, vy)
 
-
+# Extract phase transition points for markers
+phase_times = [entry[1] for entry in phase_log]
+phase_alts  = [entry[2] for entry in phase_log]
+phase_nums  = [entry[0] for entry in phase_log]
+phase_vmags = [entry[3] for entry in phase_log]
 
 # Graphing
 plt.figure(figsize=(10, 6))
-plt.plot(t, y, label='Altitude')
+plt.plot(t, y, label='Altitude', color='blue')
+for i, (pt, py, pn) in enumerate(zip(phase_times, phase_alts, phase_nums)):
+    plt.axvline(x=pt, color='red', linestyle='--', alpha=0.5)
+    plt.annotate(f'Phase {pn}',
+                xy=(pt, py),
+                xytext=(pt + 20, py + 200),
+                fontsize=8,
+                color='red')
 plt.xlabel("Time (s)")
 plt.ylabel("Height (m)")
 plt.grid()
@@ -160,6 +186,81 @@ plt.figure(figsize=(10, 6))
 plt.plot(x, y, label='Trajectory')
 plt.xlabel("Downrange Distance (m)")
 plt.ylabel("Altitude (m)")
+plt.grid()
+plt.legend()
+plt.show()
+
+plt.figure(figsize=(10, 6))
+plt.plot(t, vx, label='vx (horizontal)', color='green')
+plt.plot(t, vy, label='vy (vertical)', color='orange')
+for pt in phase_times:
+    plt.axvline(x=pt, color='red', linestyle='--', alpha=0.5)
+plt.xlabel("Time (s)")
+plt.ylabel("Velocity (m/s)")
+plt.title("Velocity Components vs Time — Case 2A")
+plt.grid()
+plt.legend()
+plt.show()
+
+plt.figure(figsize=(10, 6))
+plt.plot(t, v_mag_sol, label='Total Speed', color='purple')
+plt.axhline(y=75, color='red', linestyle='--',
+            label='Min cruise speed (~75 m/s)', alpha=0.7)
+for pt in phase_times:
+    plt.axvline(x=pt, color='gray', linestyle='--', alpha=0.5)
+plt.xlabel("Time (s)")
+plt.ylabel("Speed (m/s)")
+plt.title("Total Speed vs Time — Case 2A")
+plt.grid()
+plt.legend()
+plt.show()
+
+#checking theta_b and theta_v
+# Recompute theta_v from solution
+theta_v_history = np.arctan2(vy, vx)
+
+# Recompute theta_b from solution using same phase logic
+theta_b_history = np.zeros(len(t))
+phase_recon = 1  # reconstructed phase
+
+for i in range(len(t)):
+    y_i = y[i]
+    m_f_i = solution.y[4][i]
+
+    # Phase reconstruction - forward only
+    if phase_recon == 1 and y_i >= target / 2:
+        phase_recon = 2
+    if phase_recon == 2 and y_i >= target:
+        phase_recon = 3
+    if phase_recon == 3 and m_f_i <= mm:
+        phase_recon = 4
+
+    # Theta_b from phase
+    if phase_recon == 1:
+        progress = y_i / (target / 2)
+        theta_b_history[i] = min_angle + (max_angle - min_angle) * progress
+    elif phase_recon == 2:
+        progress = (y_i - target / 2) / (target / 2)
+        theta_b_history[i] = max(max_angle * (1 - progress), 0)
+    elif phase_recon == 3:
+        theta_b_history[i] = np.radians(5)
+    else:
+        theta_b_history[i] = np.radians(-15)
+
+# Convert to degrees for readability
+theta_b_deg = np.degrees(theta_b_history)
+theta_v_deg = np.degrees(theta_v_history)
+
+# Plot theta_b and theta_v over time
+plt.figure(figsize=(10, 6))
+plt.plot(t, theta_b_deg, label='theta_b (body angle)', color='blue')
+plt.plot(t, theta_v_deg, label='theta_v (velocity angle)', color='orange')
+for pt in phase_times:
+    plt.axvline(x=pt, color='red', linestyle='--', alpha=0.5)
+plt.axhline(y=0, color='black', linestyle='-', alpha=0.3)
+plt.xlabel("Time (s)")
+plt.ylabel("Angle (degrees)")
+plt.title("Theta Body vs Theta Velocity — Case 2A")
 plt.grid()
 plt.legend()
 plt.show()
