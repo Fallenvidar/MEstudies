@@ -90,18 +90,34 @@ def case2a(t, state):
         theta_b = -np.radians(15) # descent, fuel gone
 
 
-    #limiter for theta_v
+    #May need to remove serves as a way to make sure theta_v doesn't change crazy at low v
     if v_mag < 20.0:  # below meaningful aerodynamic speed
         theta_v = theta_b  # align with body, forces act along thrust direction
     else:
         theta_v = np.arctan2(vy, vx)
 
+    # Angle of attack is difference between body and velocity direction
+    alpha = theta_b - theta_v
+
+    #To deal with drag being greater than thrust as small v
+    # CL varies linearly with angle of attack up to stall
+    # At alpha = 0 (cruise): CL = CL_min
+    # At alpha = max (steep climb): CL = CL_max
+    CL_min = 0.3
+    CL_max = 1.5
+    alpha_max = np.radians(20)  # stall angle
+
+    # Linear variation, clamped at stall
+    alpha_clamped = np.clip(abs(alpha), 0, alpha_max)
+    CL_eff = CL_min + (CL_max - CL_min) * (alpha_clamped / alpha_max)
+
+
     #----------------------------------------
     #Outputs
     dydt = vy
     dxdt = vx
-    dvydt = (Ft * np.sin(theta_b)- mt * g - (1/2 * rho * np.exp(-y/H) * v_mag * abs(v_mag) * A * Cd) * np.sin(theta_v) + (1/2 * rho * np.exp(-y/H) * v_mag * abs(v_mag) * Aw * CL) * np.cos(theta_v)) / mt
-    dvxdt = (Ft * np.cos(theta_b) - (1/2 * rho * np.exp(-y/H) * v_mag * abs(v_mag) * A * Cd) * np.cos(theta_v) - (1/2 * rho * np.exp(-y/H) * v_mag * abs(v_mag) * Aw * CL) * np.sin(theta_v)) / mt
+    dvydt = (Ft * np.sin(theta_b)- mt * g - (1/2 * rho * np.exp(-y/H) * v_mag * abs(v_mag) * A * Cd) * np.sin(theta_v) + (1/2 * rho * np.exp(-y/H) * v_mag * abs(v_mag) * Aw * CL_eff) * np.cos(theta_v)) / mt
+    dvxdt = (Ft * np.cos(theta_b) - (1/2 * rho * np.exp(-y/H) * v_mag * abs(v_mag) * A * Cd) * np.cos(theta_v) - (1/2 * rho * np.exp(-y/H) * v_mag * abs(v_mag) * Aw * CL_eff) * np.sin(theta_v)) / mt
 
 
     return[dydt, dxdt ,dvydt, dvxdt,dm_fuel_dt]
@@ -124,7 +140,7 @@ def case2b(t, state):
     dxdt = vx
 
     dvydt = (Ft * np.sin(theta) - mt * g - ((1 / 2) * rho * np.exp(-y / H) * v * abs(v) * A * Cd) + (1/2 * rho * v * abs(v) * Aw ) ) / mt
-    dvxdt = (Ft * np.cos(theta_b) - (1/2 * rho * np.exp(-y/H) * v_mag * abs(v_mag) * A * Cd) * np.cos(theta_v) - (1/2 * rho * np.exp(-y/H) * v_mag * abs(v_mag) * Aw * CL) * np.sin(theta_v)) / mt
+    dvxdt = (Ft * np.cos(theta_b) - (1/2 * rho * np.exp(-y/H) * v_mag * abs(v_mag) * A * Cd) * np.cos(theta_v) - (1/2 * rho * np.exp(-y/H) * v_mag * abs(v_mag) * Aw * CL_eff) * np.sin(theta_v)) / mt
 
     return [dydt, dxdt, dvydt, dxydt, dm_fuel_dt]
 
