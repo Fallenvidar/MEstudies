@@ -1,1 +1,6 @@
-Week 1: Dynamic Flight Sim
+Dynamic Flight Sim
+
+Synopsis
+
+Assumptions
+
