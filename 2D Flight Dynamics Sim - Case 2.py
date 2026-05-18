@@ -103,78 +103,23 @@ def case2a(t, state):
     else:
         theta_v = np.arctan2(vy, vx)
 
-    # ---------- Aerodynamic Coefficients (α‑dependent lift, speed‑dependent drag) ----------
-    alpha = theta_b - theta_v
-    alpha_deg = np.degrees(alpha)
-
-    Cd_base = 0.02
-    if v_mag > 150:
-        Cd_speed = Cd_base + 0.005 * (v_mag - 150) / 50
-        Cd_speed = min(Cd_speed, 0.035)
-    else:
-        Cd_speed = Cd_base
-
-    CL_alpha = 0.08
-    CL_max = 1.2
-    CL = CL_max * np.tanh(CL_alpha * alpha_deg / CL_max)
-    CL = 0.7 * 0.5 + 0.3 * CL
-    k_ind = 0.1
-    Cd = Cd_speed + k_ind * CL**2
-
     D = q * A * Cd
     L = q * Aw * CL
-
-    # ---------- Theta_b Target Calculation ----------
+    #---------- Phase Logic -------
     if phase[0] == 1:
         theta_b_target = min_angle + (max_angle - min_angle) * (y / (target / 2))
     elif phase[0] == 2:
-        # Scheduled theta_b reduction (same as before)
-        theta_b_scheduled = max_angle * (1 - (y - target / 2) / (target / 2))
-        theta_b_scheduled = theta_b_scheduled - np.radians(2) * (y - target / 2) / (target / 2)
-
-        # Desired vertical acceleration to reduce vy to zero
-        # Gain increases as we approach target altitude
-        progress = (y - target / 2) / (target / 2)  # 0 → 1
-        K_vy = 0.2 * progress  # damping gain grows
-        ay_desired = -K_vy * vy  # oppose current vertical speed
-
-        # Required vertical force
-        F_aero_y = L * np.cos(theta_v) - D * np.sin(theta_v)
-        Fy_needed = mt * (g + ay_desired) - F_aero_y
-
-        if Ft > 0:
-            # Blend scheduled angle with trim needed for ay_desired
-            theta_b_trim = np.arctan(Fy_needed / Ft)
-            theta_b_trim = np.clip(theta_b_trim, np.radians(-10), np.radians(60))
-            # Use a mix: mostly scheduled, but with correction
-            blend = progress ** 2  # more correction near target
-            theta_b_target = (1 - blend) * theta_b_scheduled + blend * theta_b_trim
-        else:
-            theta_b_target = theta_b_scheduled
+        progress = (y - target / 2) / (target / 2)
+        theta_b_target = max(max_angle * (1 - progress), 0)
     elif phase[0] == 3:
-        # Trim calculation (same as before)
-        Ft = F0 * 0.7
-        alt_error = y - target
-        ay_target = -0.005 * alt_error - 0.05 * vy
-        F_aero_y = L * np.cos(theta_v) - D * np.sin(theta_v)
-        Fy_needed = mt * (g + ay_target) - F_aero_y
-        if Ft > 0:
-            theta_b_target = np.arctan(Fy_needed / Ft)
-            theta_b_target = np.clip(theta_b_target, np.radians(-3), np.radians(5))
-            theta_b_target = np.clip(theta_b_target, np.radians(-3), np.radians(5))
-        else:
-            Ft = F0
-            theta_b_target = -np.arctan(15)
-    else:   # Phase 4
-        # For phugoid demonstration: hold theta_b constant (no target change)
-        theta_b_target = theta_b
-
-    # ---------- Rate Limit Only (No Filter) ----------
-    if phase[0] != 4:
-        max_rate = np.radians(10)   # 10 deg/s max rate
-        dtheta_b_dt = np.clip(theta_b_target - theta_b, -max_rate, max_rate)
+        theta_b_target = np.radians(5)
     else:
-        dtheta_b_dt = 0.0          # freeze theta_b during glide
+        theta_b_target = theta_b  # freeze during glide
+
+    # ---------- Rate Limiter ----------
+    max_rate = np.radians(10)
+    dtheta_b_dt = np.clip(theta_b_target - theta_b, -max_rate, max_rate)
+
 
     # ---------- Equations of Motion ----------
     dydt = vy
